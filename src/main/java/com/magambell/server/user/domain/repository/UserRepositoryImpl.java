@@ -1,0 +1,73 @@
+package com.magambell.server.user.domain.repository;
+
+import static com.magambell.server.goods.domain.model.QGoods.goods;
+import static com.magambell.server.store.domain.model.QStore.store;
+import static com.magambell.server.user.domain.model.QUser.user;
+import static com.magambell.server.user.domain.model.QUserSocialAccount.userSocialAccount;
+
+import com.magambell.server.auth.domain.ProviderType;
+import com.magambell.server.user.app.port.out.dto.UserInfoDTO;
+import com.magambell.server.user.domain.enums.UserStatus;
+import com.magambell.server.user.domain.model.User;
+import com.querydsl.core.types.Projections;
+import com.querydsl.jpa.impl.JPAQueryFactory;
+import java.util.Optional;
+import lombok.RequiredArgsConstructor;
+
+@RequiredArgsConstructor
+public class UserRepositoryImpl implements UserRepositoryCustom {
+
+    private final JPAQueryFactory queryFactory;
+
+    @Override
+    public Optional<User> findUserBySocial(final ProviderType providerType, final String providerId) {
+        return Optional.ofNullable(
+                queryFactory
+                        .selectFrom(user)
+                        .join(user.userSocialAccounts, userSocialAccount).fetchJoin()
+                        .where(
+                                userSocialAccount.providerType.eq(providerType),
+                                userSocialAccount.providerId.eq(providerId),
+                                user.userStatus.eq(UserStatus.ACTIVE)
+                        )
+                        .fetchOne()
+        );
+    }
+
+    @Override
+    public UserInfoDTO getUserInfo(final Long userId) {
+
+        return queryFactory.select(Projections.constructor(UserInfoDTO.class,
+                        user.email,
+                        user.nickName,
+                        user.userRole,
+                        userSocialAccount.providerType,
+                        store.approved,
+                        goods.id
+                ))
+                .from(user)
+                .leftJoin(userSocialAccount).on(userSocialAccount.user.id.eq(user.id))
+                .leftJoin(store).on(store.user.id.eq(user.id))
+                .leftJoin(goods).on(goods.store.id.eq(store.id))
+                .where(
+                        user.id.eq(userId),
+                        user.userStatus.eq(UserStatus.ACTIVE)
+                )
+                .fetchOne();
+    }
+
+    @Override
+    public boolean existsUserBySocial(final ProviderType providerType, final String providerId) {
+        Integer result = queryFactory
+                .selectOne()
+                .from(user)
+                .join(user.userSocialAccounts, userSocialAccount)
+                .where(
+                        userSocialAccount.providerType.eq(providerType),
+                        userSocialAccount.providerId.eq(providerId),
+                        user.userStatus.eq(UserStatus.ACTIVE)
+                )
+                .fetchFirst();
+        return result != null;
+    }
+}
