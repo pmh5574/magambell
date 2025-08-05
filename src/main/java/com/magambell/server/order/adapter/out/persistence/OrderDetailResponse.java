@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 
 public record OrderDetailResponse(
         String orderId,
+        String orderGoodsId,
         OrderStatus orderStatus,
         String storeName,
         String storeAddress,
@@ -13,6 +14,7 @@ public record OrderDetailResponse(
         Integer totalPrice,
         LocalDateTime pickupTime,
         String memo,
+        LocalDateTime createdAt,
         String storeId,
         String reviewId
 ) {

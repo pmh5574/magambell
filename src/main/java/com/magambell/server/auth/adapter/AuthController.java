@@ -44,11 +44,12 @@ public class AuthController {
     }
 
     @Operation(summary = "회원 탈퇴")
-    @ApiResponse(responseCode = "204")
+    @ApiResponse(responseCode = "204", content = {@Content(schema = @Schema(implementation = BaseResponse.class))})
     @DeleteMapping("/withdraw")
-    public void withdraw(@RequestBody @Validated final SocialWithdrawRequest request,
-                         @AuthenticationPrincipal final CustomUserDetails customUserDetails) {
+    public Response<BaseResponse> withdraw(@RequestBody @Validated final SocialWithdrawRequest request,
+                                           @AuthenticationPrincipal final CustomUserDetails customUserDetails) {
         authUseCase.withdrawUser(request.toService(), customUserDetails);
+        return new Response<>();
     }
 
     @Operation(summary = "고객 토큰 재발행")
@@ -61,6 +62,30 @@ public class AuthController {
         JwtToken jwtToken = authUseCase.reissueAccessToken(reissueAccessToken.refreshToken());
         res.setHeader("Authorization", jwtToken.accessToken());
         res.setHeader("RefreshToken", jwtToken.refreshToken());
+        return new Response<>();
+    }
+
+    @Operation(summary = "oAuth 테스트 고객님 계정 로그인")
+    @ApiResponse(responseCode = "200", content = {@Content(schema = @Schema(implementation = BaseResponse.class))})
+    @PostMapping("/user/test")
+    public Response<BaseResponse> userTest(HttpServletResponse response) {
+        //todo 애플, 구글 테스트 후 삭제
+        JwtToken jwtToken = authUseCase.userTest();
+
+        response.setHeader("Authorization", jwtToken.accessToken());
+        response.setHeader("RefreshToken", jwtToken.refreshToken());
+        return new Response<>();
+    }
+
+    @Operation(summary = "oAuth 테스트 사장님 계정 로그인")
+    @ApiResponse(responseCode = "200", content = {@Content(schema = @Schema(implementation = BaseResponse.class))})
+    @PostMapping("/owner/test")
+    public Response<BaseResponse> ownerTest(HttpServletResponse response) {
+        //todo 애플, 구글 테스트 후 삭제
+        JwtToken jwtToken = authUseCase.ownerTest();
+
+        response.setHeader("Authorization", jwtToken.accessToken());
+        response.setHeader("RefreshToken", jwtToken.refreshToken());
         return new Response<>();
     }
 }

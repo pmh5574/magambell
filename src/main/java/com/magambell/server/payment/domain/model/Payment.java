@@ -5,10 +5,9 @@ import static com.magambell.server.payment.app.service.PaymentService.MERCHANT_U
 import com.magambell.server.common.BaseTimeEntity;
 import com.magambell.server.order.domain.model.Order;
 import com.magambell.server.payment.app.port.in.dto.CreatePaymentDTO;
-import com.magambell.server.payment.domain.enums.EasyPayProvider;
-import com.magambell.server.payment.domain.enums.PayType;
 import com.magambell.server.payment.domain.enums.PaymentStatus;
 import com.magambell.server.payment.infra.PortOnePaymentResponse;
+import com.magambell.server.user.domain.model.User;
 import io.hypersistence.utils.hibernate.id.Tsid;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -20,6 +19,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OneToOne;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.Set;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -37,12 +37,8 @@ public class Payment extends BaseTimeEntity {
 
     private String transactionId;
     private String merchantUid;
-
-    @Enumerated(EnumType.STRING)
-    private PayType payType;
-
-    @Enumerated(EnumType.STRING)
-    private EasyPayProvider easyPayProvider;
+    private String payType;
+    private String easyPayProvider;
     private String cardName;
     private Integer amount;
 
@@ -57,8 +53,8 @@ public class Payment extends BaseTimeEntity {
     private Order order;
 
     @Builder(access = AccessLevel.PRIVATE)
-    private Payment(final String transactionId, final String merchantUid, final PayType payType,
-                    final EasyPayProvider easyPayProvider, final String cardName,
+    private Payment(final String transactionId, final String merchantUid, final String payType,
+                    final String easyPayProvider, final String cardName,
                     final Integer amount, final PaymentStatus paymentStatus, final LocalDateTime paidAt,
                     final String failReason,
                     final String cancelReason) {
@@ -99,7 +95,7 @@ public class Payment extends BaseTimeEntity {
         this.paymentStatus = PaymentStatus.PAID;
         this.transactionId = response.transactionId();
         this.paidAt = response.paidAt().atZoneSameInstant(ZoneId.of("Asia/Seoul")).toLocalDateTime();
-        this.payType = resolvePayType(response);
+        this.payType = response.method().type();
         this.easyPayProvider = response.method().provider();
         this.order.paid();
     }
@@ -118,14 +114,7 @@ public class Payment extends BaseTimeEntity {
         this.order.failed();
     }
 
-    private PayType resolvePayType(PortOnePaymentResponse response) {
-        if (response.method() != null && response.method().type() != null) {
-            return switch (response.method().type()) {
-                case "PaymentMethodEasyPay" -> PayType.EASY_PAY;
-                case "PaymentMethodCard" -> PayType.CARD;
-                default -> null;
-            };
-        }
-        return null;
+    public Set<User> getOrderStoreOwner() {
+        return this.order.getOrderStoreOwner();
     }
 }

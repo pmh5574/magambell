@@ -1,8 +1,10 @@
 package com.magambell.server.store.app.service;
 
 import static com.magambell.server.goods.domain.enums.SaleStatus.ON;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import com.magambell.server.auth.domain.ProviderType;
+import com.magambell.server.common.s3.dto.ImageRegister;
 import com.magambell.server.goods.app.port.in.dto.RegisterGoodsDTO;
 import com.magambell.server.goods.domain.model.Goods;
 import com.magambell.server.goods.domain.repository.GoodsRepository;
@@ -10,17 +12,20 @@ import com.magambell.server.stock.domain.model.Stock;
 import com.magambell.server.stock.domain.repository.StockHistoryRepository;
 import com.magambell.server.stock.domain.repository.StockRepository;
 import com.magambell.server.store.adapter.in.web.StoreImagesRegister;
+import com.magambell.server.store.adapter.out.persistence.StoreDetailResponse;
 import com.magambell.server.store.adapter.out.persistence.StoreListResponse;
 import com.magambell.server.store.app.port.in.dto.RegisterStoreDTO;
+import com.magambell.server.store.app.port.in.request.CloseStoreListServiceRequest;
 import com.magambell.server.store.app.port.in.request.RegisterStoreServiceRequest;
 import com.magambell.server.store.app.port.in.request.SearchStoreListServiceRequest;
-import com.magambell.server.store.app.port.out.dto.StoreDetailDTO;
+import com.magambell.server.store.app.port.in.request.WaitingStoreListServiceRequest;
 import com.magambell.server.store.app.port.out.response.OwnerStoreDetailDTO;
 import com.magambell.server.store.app.port.out.response.StoreListDTOResponse;
 import com.magambell.server.store.domain.enums.Approved;
 import com.magambell.server.store.domain.enums.Bank;
 import com.magambell.server.store.domain.enums.SearchSortType;
 import com.magambell.server.store.domain.model.Store;
+import com.magambell.server.store.domain.model.StoreImage;
 import com.magambell.server.store.domain.repository.StoreImageRepository;
 import com.magambell.server.store.domain.repository.StoreRepository;
 import com.magambell.server.user.app.port.in.dto.UserSocialAccountDTO;
@@ -31,7 +36,6 @@ import com.magambell.server.user.domain.repository.UserSocialAccountRepository;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.IntStream;
-import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -96,7 +100,7 @@ class StoreServiceTest {
                 "대표이름",
                 "01012345678",
                 "123491923",
-                Bank.IBK기업은행,
+                Bank.KB국민,
                 "102391485",
                 List.of(new StoreImagesRegister(0, "test"))
         );
@@ -106,7 +110,7 @@ class StoreServiceTest {
 
         // then
         Store store = storeRepository.findAll().get(0);
-        Assertions.assertThat(store).extracting("name", "address", "ownerPhone")
+        assertThat(store).extracting("name", "address", "ownerPhone")
                 .contains(
                         "테스트 매장",
                         "서울 강서구 테스트 211",
@@ -115,7 +119,7 @@ class StoreServiceTest {
 
     @DisplayName("매장 리스트를 가져온다.")
     @Test
-    void getStoreDetailList() {
+    void getStoreList() {
         // given
         SearchStoreListServiceRequest request = new SearchStoreListServiceRequest(
                 37.5665, 37.5665, "", SearchSortType.RECENT_DESC, true, 1, 30
@@ -130,11 +134,9 @@ class StoreServiceTest {
         // when
         StoreListResponse storeListResponse = storeService.getStoreList(request);
 
-        storeRepository.findAll().forEach(s -> System.out.println(s.getName() + " - " + s.getCreatedAt()));
-
         // then
         StoreListDTOResponse store = storeListResponse.storeListDTOResponses().get(0);
-        Assertions.assertThat(store)
+        assertThat(store)
                 .extracting("storeName", "startTime", "endTime", "originPrice", "discount", "salePrice",
                         "quantity")
                 .contains(
@@ -156,15 +158,15 @@ class StoreServiceTest {
         storeRepository.save(store);
 
         // when
-        StoreDetailDTO result = storeService.getStoreDetail(store.getId());
+        StoreDetailResponse result = storeService.getStoreDetail(store.getId());
 
         // then
-        Assertions.assertThat(result).isNotNull();
-        Assertions.assertThat(result.storeId()).isEqualTo(store.getId());
-        Assertions.assertThat(result.storeName()).isEqualTo("테스트 매장1");
-        Assertions.assertThat(result.description()).isEqualTo("상품설명");
-        Assertions.assertThat(result.salePrice()).isEqualTo(9000);
-        Assertions.assertThat(result.images()).isEmpty();
+        assertThat(result).isNotNull();
+        assertThat(result.storeId()).isEqualTo(String.valueOf(store.getId()));
+        assertThat(result.storeName()).isEqualTo("테스트 매장1");
+        assertThat(result.description()).isEqualTo("상품설명");
+        assertThat(result.salePrice()).isEqualTo(9000);
+        assertThat(result.images()).isEmpty();
     }
 
     @DisplayName("관리자 매장 상세 정보를 조회한다")
@@ -178,10 +180,67 @@ class StoreServiceTest {
         OwnerStoreDetailDTO ownerStoreInfo = storeService.getOwnerStoreInfo(user.getId());
 
         // then
-        Assertions.assertThat(ownerStoreInfo).isNotNull();
-        Assertions.assertThat(ownerStoreInfo.storeName()).isEqualTo("테스트 매장1");
-        Assertions.assertThat(ownerStoreInfo.goodsList().get(0).description()).isEqualTo("상품설명");
-        Assertions.assertThat(ownerStoreInfo.goodsList().get(0).salePrice()).isEqualTo(9000);
+        assertThat(ownerStoreInfo).isNotNull();
+        assertThat(ownerStoreInfo.storeName()).isEqualTo("테스트 매장1");
+        assertThat(ownerStoreInfo.goodsList().get(0).description()).isEqualTo("상품설명");
+        assertThat(ownerStoreInfo.goodsList().get(0).salePrice()).isEqualTo(9000);
+    }
+
+    @DisplayName("내 주변 매장 리스트")
+    @Test
+    void getCloseStoreList() {
+        // given
+        CloseStoreListServiceRequest request = new CloseStoreListServiceRequest(37.6000, 37.5665);
+
+        List<Store> storeList = IntStream.range(1, 31)
+                .mapToObj(this::createStore)
+                .toList();
+
+        storeRepository.saveAll(storeList);
+
+        // when
+        StoreListResponse closeStoreList = storeService.getCloseStoreList(request);
+
+        // then
+        assertThat(closeStoreList.storeListDTOResponses()).hasSize(30);
+    }
+
+    @DisplayName("내 주변 매장 리스트 5km 근처에 없을 때")
+    @Test
+    void getCloseStoreListIs5KmLimit() {
+        // given
+        CloseStoreListServiceRequest request = new CloseStoreListServiceRequest(37.6300, 37.5665);
+
+        List<Store> storeList = IntStream.range(1, 31)
+                .mapToObj(this::createStore)
+                .toList();
+
+        storeRepository.saveAll(storeList);
+
+        // when
+        StoreListResponse closeStoreList = storeService.getCloseStoreList(request);
+
+        // then
+        assertThat(closeStoreList.storeListDTOResponses()).hasSize(0);
+    }
+
+    @DisplayName("승인 대기중인 매장 리스트를 가져온다.")
+    @Test
+    void getWaitingStoreList() {
+        // given
+        WaitingStoreListServiceRequest request = new WaitingStoreListServiceRequest(1, 10);
+
+        List<Store> storeList = IntStream.range(1, 31)
+                .mapToObj(this::createStore)
+                .toList();
+
+        storeRepository.saveAll(storeList);
+
+        // when
+        StoreListResponse storeListResponse = storeService.getWaitingStoreList(request);
+
+        // then
+        assertThat(storeListResponse.storeListDTOResponses()).hasSize(0);
     }
 
     private Store createStore(int i) {
@@ -200,7 +259,7 @@ class StoreServiceTest {
                 "대표이름",
                 "01012345678",
                 "123491923",
-                Bank.IBK기업은행,
+                Bank.KB국민,
                 "102391485",
                 List.of(),
                 Approved.APPROVED,
@@ -208,6 +267,8 @@ class StoreServiceTest {
         );
 
         Store store = registerStoreDTO.toEntity();
+        List<ImageRegister> images = registerStoreDTO.toImage();
+        images.forEach(image -> store.addStoreImage(StoreImage.create(image.key(), image.id())));
 
         RegisterGoodsDTO registerGoodsDTO = new RegisterGoodsDTO(
                 LocalDateTime.of(2025, 1, 1, 9, 0), LocalDateTime.of(2025, 1, 1, 18, 0),

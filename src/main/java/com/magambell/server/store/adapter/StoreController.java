@@ -3,15 +3,16 @@ package com.magambell.server.store.adapter;
 import com.magambell.server.common.Response;
 import com.magambell.server.common.security.CustomUserDetails;
 import com.magambell.server.common.swagger.BaseResponse;
+import com.magambell.server.store.adapter.in.web.CloseStoreListRequest;
 import com.magambell.server.store.adapter.in.web.RegisterStoreRequest;
 import com.magambell.server.store.adapter.in.web.SearchStoreListRequest;
 import com.magambell.server.store.adapter.in.web.StoreApproveRequest;
+import com.magambell.server.store.adapter.in.web.WaitingStoreListRequest;
 import com.magambell.server.store.adapter.out.persistence.OwnerStoreDetailResponse;
 import com.magambell.server.store.adapter.out.persistence.StoreDetailResponse;
 import com.magambell.server.store.adapter.out.persistence.StoreImagesResponse;
 import com.magambell.server.store.adapter.out.persistence.StoreListResponse;
 import com.magambell.server.store.app.port.in.StoreUseCase;
-import com.magambell.server.store.app.port.out.dto.StoreDetailDTO;
 import com.magambell.server.store.app.port.out.response.OwnerStoreDetailDTO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -68,8 +69,7 @@ public class StoreController {
     public Response<StoreDetailResponse> getStore(
             @PathVariable final Long storeId
     ) {
-        StoreDetailDTO storeDetail = storeUseCase.getStoreDetail(storeId);
-        return new Response<>(storeDetail.toResponse());
+        return new Response<>(storeUseCase.getStoreDetail(storeId));
     }
 
     @Operation(summary = "매장 승인")
@@ -94,5 +94,26 @@ public class StoreController {
     ) {
         OwnerStoreDetailDTO ownerStoreInfo = storeUseCase.getOwnerStoreInfo(customUserDetails.userId());
         return new Response<>(new OwnerStoreDetailResponse(ownerStoreInfo));
+    }
+
+    @Operation(summary = "내 주변 매장 리스트")
+    @ApiResponse(responseCode = "200", content = {
+            @Content(schema = @Schema(implementation = StoreListResponse.class))})
+    @GetMapping("/close")
+    public Response<StoreListResponse> getCloseStoreList(
+            @ModelAttribute @Validated final CloseStoreListRequest request
+    ) {
+        return new Response<>(storeUseCase.getCloseStoreList(request.toService()));
+    }
+
+    @Operation(summary = "승인 대기중인 매장 리스트")
+    @ApiResponse(responseCode = "200", content = {
+            @Content(schema = @Schema(implementation = StoreListResponse.class))})
+    @GetMapping("/waiting")
+    public Response<StoreListResponse> getWaitingStoreList(
+            @ModelAttribute @Validated final WaitingStoreListRequest request
+    ) {
+        // todo 추후 관리자 용으로 변경
+        return new Response<>(storeUseCase.getWaitingStoreList(request.toService()));
     }
 }

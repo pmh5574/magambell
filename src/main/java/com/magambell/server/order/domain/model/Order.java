@@ -3,6 +3,7 @@ package com.magambell.server.order.domain.model;
 import com.magambell.server.common.BaseTimeEntity;
 import com.magambell.server.order.app.port.in.dto.CreateOrderDTO;
 import com.magambell.server.order.domain.enums.OrderStatus;
+import com.magambell.server.order.domain.enums.PickupNotificationStatus;
 import com.magambell.server.payment.domain.model.Payment;
 import com.magambell.server.user.domain.model.User;
 import io.hypersistence.utils.hibernate.id.Tsid;
@@ -21,6 +22,8 @@ import jakarta.persistence.Table;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -41,6 +44,8 @@ public class Order extends BaseTimeEntity {
     private OrderStatus orderStatus;
     private Integer totalPrice;
     private LocalDateTime pickupTime;
+    @Enumerated(EnumType.STRING)
+    private PickupNotificationStatus pickupNotificationStatus;
     private String memo;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -55,10 +60,12 @@ public class Order extends BaseTimeEntity {
 
     @Builder(access = AccessLevel.PRIVATE)
     private Order(final OrderStatus orderStatus, final Integer totalPrice, final LocalDateTime pickupTime,
+                  final PickupNotificationStatus pickupNotificationStatus,
                   final String memo) {
         this.orderStatus = orderStatus;
         this.totalPrice = totalPrice;
         this.pickupTime = pickupTime;
+        this.pickupNotificationStatus = pickupNotificationStatus;
         this.memo = memo;
     }
 
@@ -67,6 +74,8 @@ public class Order extends BaseTimeEntity {
                 .orderStatus(orderStatus)
                 .totalPrice(dto.totalPrice())
                 .pickupTime(dto.pickupTime())
+                .pickupNotificationStatus(PickupNotificationStatus.NOT_SENT)
+                .memo(dto.memo())
                 .build();
 
         OrderGoods orderGoods = dto.toOrderGoods();
@@ -124,5 +133,15 @@ public class Order extends BaseTimeEntity {
                 .getStore()
                 .getUser()
                 .equals(user);
+    }
+
+    public Set<User> getOrderStoreOwner() {
+        return orderGoodsList.stream()
+                .map(orderGoods -> orderGoods.getGoods().getStore().getUser())
+                .collect(Collectors.toSet());
+    }
+
+    public void markPickupNotificationSent() {
+        this.pickupNotificationStatus = PickupNotificationStatus.SENT;
     }
 }

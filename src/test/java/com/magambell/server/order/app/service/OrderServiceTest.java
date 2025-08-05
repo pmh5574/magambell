@@ -5,13 +5,16 @@ import static com.magambell.server.order.domain.enums.OrderStatus.PAID;
 import static com.magambell.server.payment.app.service.PaymentService.MERCHANT_UID_PREFIX;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
+import com.google.firebase.messaging.FirebaseMessagingException;
 import com.magambell.server.auth.domain.ProviderType;
 import com.magambell.server.goods.app.port.in.dto.RegisterGoodsDTO;
 import com.magambell.server.goods.domain.model.Goods;
 import com.magambell.server.goods.domain.repository.GoodsRepository;
+import com.magambell.server.notification.infra.FirebaseNotificationSender;
 import com.magambell.server.order.app.port.in.dto.CreateOrderDTO;
 import com.magambell.server.order.app.port.in.request.CreateOrderServiceRequest;
 import com.magambell.server.order.app.port.in.request.CustomerOrderListServiceRequest;
@@ -81,6 +84,8 @@ class OrderServiceTest {
     private PaymentRepository paymentRepository;
     @MockBean
     private PortOnePort portOnePort;
+    @MockBean
+    private FirebaseNotificationSender firebaseNotificationSender;
     private User user;
     private Goods goods;
     private User owner;
@@ -114,7 +119,7 @@ class OrderServiceTest {
                 "대표",
                 "01099998888",
                 "123123",
-                Bank.IBK기업은행,
+                Bank.KB국민,
                 "9876543210",
                 List.of(),
                 Approved.APPROVED,
@@ -162,7 +167,7 @@ class OrderServiceTest {
         );
 
         // when
-        orderService.createOrder(request, user.getId());
+        orderService.createOrder(request, user.getId(), LocalDateTime.now().plusMinutes(10));
 
         // then
         Goods updatedGoods = goodsRepository.findById(goods.getId()).orElse(null);
@@ -222,7 +227,7 @@ class OrderServiceTest {
         assertThat(orderDetail.totalPrice()).isEqualTo(9000);
     }
 
-    @DisplayName("사장님 주문목록")
+    @DisplayName("사장님 전체 주문 목록")
     @Test
     void getOrderStoreList() {
         // given
@@ -230,7 +235,7 @@ class OrderServiceTest {
                 .mapToObj(this::createOrder)
                 .toList();
         orderRepository.saveAll(orderList);
-        OwnerOrderListServiceRequest request = new OwnerOrderListServiceRequest(1, 10);
+        OwnerOrderListServiceRequest request = new OwnerOrderListServiceRequest(1, 10, null);
 
         // when
         List<OrderStoreListDTO> orderStoreList = orderService.getOrderStoreList(request, owner.getId());
@@ -246,9 +251,33 @@ class OrderServiceTest {
                 );
     }
 
+    @DisplayName("사장님 주문 목록 - 대기(PAID)")
+    @Test
+    void getOrderStoreListByStatusPaid() {
+        // given
+        List<Order> orderList = IntStream.range(1, 31)
+                .mapToObj(this::createOrderPaid)
+                .toList();
+        orderRepository.saveAll(orderList);
+        OwnerOrderListServiceRequest request = new OwnerOrderListServiceRequest(1, 10, PAID);
+
+        // when
+        List<OrderStoreListDTO> orderStoreList = orderService.getOrderStoreList(request, owner.getId());
+
+        // then
+        assertThat(orderStoreList.size()).isEqualTo(10);
+        assertThat(orderStoreList.get(0)).extracting("orderStatus", "pickupTime", "quantity", "totalPrice")
+                .contains(
+                        PAID,
+                        LocalDateTime.of(2025, 6, 30, 17, 30),
+                        30,
+                        9000
+                );
+    }
+
     @DisplayName("사장님이 주문을 승인하면 상태가 ACCEPTED로 변경된다.")
     @Test
-    void approveOrder() {
+    void approveOrder() throws FirebaseMessagingException {
         // given
         CreateOrderDTO createOrderDTO = new CreateOrderDTO(user, goods, 1, 9000, LocalDateTime.of(2025, 6, 30, 17, 30),
                 "test");
@@ -260,6 +289,8 @@ class OrderServiceTest {
         paymentRepository.save(payment);
 
         // when
+        doNothing().when(firebaseNotificationSender)
+                .send("testToken", "테스트 매장", "테스트 매장");
         orderService.approveOrder(order.getId(), owner.getId(), LocalDateTime.of(2025, 6, 30, 13, 30));
 
         // then
@@ -269,7 +300,7 @@ class OrderServiceTest {
 
     @DisplayName("사장님이 주문을 거절하면 상태가 REJECTED로 변경되고 재고가 복구되며 결제 취소 요청이 호출된다.")
     @Test
-    void rejectOrder() {
+    void rejectOrder() throws FirebaseMessagingException {
         // given
         CreateOrderServiceRequest request = new CreateOrderServiceRequest(
                 goods.getId(),
@@ -278,13 +309,15 @@ class OrderServiceTest {
                 LocalDateTime.now().plusMinutes(30),
                 "빨리 주세요"
         );
-        orderService.createOrder(request, user.getId());
+        orderService.createOrder(request, user.getId(), LocalDateTime.now().plusMinutes(10));
 
         Order order = orderRepository.findAll().get(0);
         order.paid();
         orderRepository.save(order);
 
         // when
+        doNothing().when(firebaseNotificationSender)
+                .send("testToken", "테스트 매장", "테스트 매장");
         orderService.rejectOrder(order.getId(), owner.getId());
 
         // then
@@ -309,7 +342,7 @@ class OrderServiceTest {
                 LocalDateTime.now().plusMinutes(30),
                 "빨리 주세요"
         );
-        orderService.createOrder(request, user.getId());
+        orderService.createOrder(request, user.getId(), LocalDateTime.now().plusMinutes(10));
 
         Order order = orderRepository.findAll().get(0);
         order.paid();
@@ -355,6 +388,14 @@ class OrderServiceTest {
                 "test");
         Order createOrder = createOrderDTO.toOrder();
         createOrder.completed();
+        return createOrder;
+    }
+
+    private Order createOrderPaid(int i) {
+        CreateOrderDTO createOrderDTO = new CreateOrderDTO(user, goods, i, 9000, LocalDateTime.of(2025, 6, 30, 17, 30),
+                "test");
+        Order createOrder = createOrderDTO.toOrder();
+        createOrder.paid();
         return createOrder;
     }
 }

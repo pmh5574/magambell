@@ -7,6 +7,7 @@ import com.magambell.server.common.exception.InvalidRequestException;
 import com.magambell.server.common.exception.UnauthorizedException;
 import com.magambell.server.goods.app.port.out.GoodsQueryPort;
 import com.magambell.server.goods.domain.model.Goods;
+import com.magambell.server.notification.app.port.in.NotificationUseCase;
 import com.magambell.server.order.app.port.in.OrderUseCase;
 import com.magambell.server.order.app.port.in.request.CreateOrderServiceRequest;
 import com.magambell.server.order.app.port.in.request.CustomerOrderListServiceRequest;
@@ -34,14 +35,22 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 @Service
 public class OrderService implements OrderUseCase {
+
+    private static final List<OrderStatus> OWNER_LIST_VALID_STATUSES = List.of(
+            OrderStatus.PAID,
+            OrderStatus.ACCEPTED,
+            OrderStatus.COMPLETED
+    );
 
     private final OrderCommandPort orderCommandPort;
     private final OrderQueryPort orderQueryPort;
@@ -52,17 +61,19 @@ public class OrderService implements OrderUseCase {
     private final StockQueryPort stockQueryPort;
     private final StockUseCase stockUseCase;
     private final PortOnePort portOnePort;
+    private final NotificationUseCase notificationUseCase;
 
     @Transactional
     @Override
-    public CreateOrderResponseDTO createOrder(final CreateOrderServiceRequest request, final Long userId) {
+    public CreateOrderResponseDTO createOrder(final CreateOrderServiceRequest request, final Long userId,
+                                              final LocalDateTime now) {
         User user = userQueryPort.findById(userId);
         Goods goods = goodsQueryPort.findById(request.goodsId());
         Stock stock = stockQueryPort.findByGoodsIdWithLock(goods.getId());
         StockHistory stockHistory = stock.recordDecrease(goods, request.quantity());
         stockCommandPort.saveStockHistory(stockHistory);
 
-        validateOrderRequest(request, goods);
+        validateOrderRequest(request, goods, now);
 
         Order order = orderCommandPort.createOrder(request.toDTO(user, goods));
 
@@ -89,8 +100,12 @@ public class OrderService implements OrderUseCase {
 
     @Override
     public List<OrderStoreListDTO> getOrderStoreList(final OwnerOrderListServiceRequest request, final Long userId) {
+        if (request.orderStatus() != null && !OWNER_LIST_VALID_STATUSES.contains(request.orderStatus())) {
+            throw new InvalidRequestException(ErrorCode.INVALID_ORDER_STATUS);
+        }
         User user = userQueryPort.findById(userId);
-        return orderQueryPort.getOrderStoreList(PageRequest.of(request.page() - 1, request.size()), user.getId());
+        return orderQueryPort.getOrderStoreList(PageRequest.of(request.page() - 1, request.size()), user.getId()
+                , request.orderStatus());
     }
 
     @Transactional
@@ -100,6 +115,8 @@ public class OrderService implements OrderUseCase {
         Order order = orderQueryPort.findOwnerWithAllById(orderId);
         validateApproveOrder(user, order, now);
         order.accepted();
+
+        notificationUseCase.notifyApproveOrder(order.getUser(), order.getPickupTime());
     }
 
     @Transactional
@@ -114,6 +131,7 @@ public class OrderService implements OrderUseCase {
         Payment payment = order.getPayment();
         stockUseCase.restoreStockIfNecessary(payment);
         portOnePort.cancelPayment(payment.getMerchantUid(), order.getTotalPrice(), "사장님 주문 취소");
+        notificationUseCase.notifyRejectOrder(order.getUser());
     }
 
     @Transactional
@@ -140,13 +158,47 @@ public class OrderService implements OrderUseCase {
         order.completed();
     }
 
-    private void validateOrderRequest(final CreateOrderServiceRequest request, final Goods goods) {
+    @Transactional
+    @Override
+    public void batchRejectOrdersBeforePickup(final LocalDateTime pickupTime, final LocalDateTime createdAtCutOff) {
+        List<Order> orders = orderQueryPort.findByPaidBeforePickupRejectProcessedOrders(pickupTime, createdAtCutOff);
+        orders.forEach(order -> {
+            log.info("[픽업 30분 전] 시스템 주문 거절 order = {}", order.getId());
+            order.rejected();
+            Payment payment = order.getPayment();
+            stockUseCase.restoreStockIfNecessary(payment);
+            portOnePort.cancelPayment(payment.getMerchantUid(), order.getTotalPrice(), "시스템 주문 취소");
+            notificationUseCase.notifyRejectOrder(order.getUser());
+        });
+    }
+
+    @Transactional
+    @Override
+    public void autoRejectOrdersAfter(final LocalDateTime minusMinutes, final LocalDateTime pickupTime) {
+        List<Order> orders = orderQueryPort.findByAutoRejectProcessedOrders(minusMinutes,
+                pickupTime);
+        orders.forEach(order -> {
+            log.info("[5분 마다] 시스템 주문 거절 order = {}", order.getId());
+            order.rejected();
+            Payment payment = order.getPayment();
+            stockUseCase.restoreStockIfNecessary(payment);
+            portOnePort.cancelPayment(payment.getMerchantUid(), order.getTotalPrice(), "시스템 주문 취소");
+            notificationUseCase.notifyRejectOrder(order.getUser());
+        });
+    }
+
+    private void validateOrderRequest(final CreateOrderServiceRequest request, final Goods goods,
+                                      final LocalDateTime now) {
         if (request.totalPrice() != goods.getSalePrice() * request.quantity()) {
             throw new InvalidRequestException(ErrorCode.INVALID_TOTAL_PRICE);
         }
 
         if (request.pickupTime().isBefore(goods.getStartTime()) || request.pickupTime().isAfter(goods.getEndTime())) {
             throw new InvalidRequestException(ErrorCode.INVALID_PICKUP_TIME);
+        }
+
+        if (!request.pickupTime().isAfter(now)) {
+            throw new InvalidRequestException(ErrorCode.INVALID_NOW_TIME_PICKUP_TIME);
         }
     }
 

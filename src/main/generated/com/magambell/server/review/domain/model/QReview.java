@@ -34,13 +34,15 @@ public class QReview extends EntityPathBase<Review> {
     //inherited
     public final DateTimePath<java.time.LocalDateTime> modifiedAt = _super.modifiedAt;
 
-    public final com.magambell.server.order.domain.model.QOrder order;
+    public final com.magambell.server.order.domain.model.QOrderGoods orderGoods;
 
     public final NumberPath<Integer> rating = createNumber("rating", Integer.class);
 
     public final ListPath<ReviewImage, QReviewImage> reviewImages = this.<ReviewImage, QReviewImage>createList("reviewImages", ReviewImage.class, QReviewImage.class, PathInits.DIRECT2);
 
     public final ListPath<ReviewReason, QReviewReason> reviewReasons = this.<ReviewReason, QReviewReason>createList("reviewReasons", ReviewReason.class, QReviewReason.class, PathInits.DIRECT2);
+
+    public final EnumPath<com.magambell.server.review.domain.enums.ReviewStatus> reviewStatus = createEnum("reviewStatus", com.magambell.server.review.domain.enums.ReviewStatus.class);
 
     public final com.magambell.server.user.domain.model.QUser user;
 
@@ -62,7 +64,7 @@ public class QReview extends EntityPathBase<Review> {
 
     public QReview(Class<? extends Review> type, PathMetadata metadata, PathInits inits) {
         super(type, metadata, inits);
-        this.order = inits.isInitialized("order") ? new com.magambell.server.order.domain.model.QOrder(forProperty("order"), inits.get("order")) : null;
+        this.orderGoods = inits.isInitialized("orderGoods") ? new com.magambell.server.order.domain.model.QOrderGoods(forProperty("orderGoods"), inits.get("orderGoods")) : null;
         this.user = inits.isInitialized("user") ? new com.magambell.server.user.domain.model.QUser(forProperty("user"), inits.get("user")) : null;
     }
 

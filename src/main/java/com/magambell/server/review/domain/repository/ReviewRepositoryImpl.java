@@ -9,13 +9,14 @@ import static com.magambell.server.review.domain.model.QReviewReason.reviewReaso
 import static com.magambell.server.store.domain.model.QStore.store;
 import static com.magambell.server.user.domain.model.QUser.user;
 import static com.querydsl.core.group.GroupBy.groupBy;
-import static com.querydsl.core.group.GroupBy.list;
+import static com.querydsl.core.group.GroupBy.set;
 
 import com.magambell.server.order.domain.enums.OrderStatus;
 import com.magambell.server.review.app.port.in.request.ReviewListServiceRequest;
 import com.magambell.server.review.app.port.in.request.ReviewRatingAllServiceRequest;
 import com.magambell.server.review.app.port.out.response.ReviewListDTO;
 import com.magambell.server.review.app.port.out.response.ReviewRatingSummaryDTO;
+import com.magambell.server.review.domain.enums.ReviewStatus;
 import com.magambell.server.user.domain.enums.UserStatus;
 import com.querydsl.core.BooleanBuilder;
 import com.querydsl.core.Tuple;
@@ -39,40 +40,12 @@ public class ReviewRepositoryImpl implements ReviewRepositoryCustom {
         conditions.and(goods.id.eq(request.goodsId()));
         conditions.and(user.userStatus.eq(UserStatus.ACTIVE));
         conditions.and(order.orderStatus.eq(OrderStatus.COMPLETED));
+        conditions.and(review.reviewStatus.eq(ReviewStatus.ACTIVE));
         if (request.imageCheck()) {
             conditions.and(reviewImage.isNotNull());
         }
 
-        return queryFactory
-                .select(review, reviewImage, order, orderGoods, goods, store, user)
-                .from(review)
-                .leftJoin(reviewImage).on(reviewImage.review.id.eq(review.id))
-                .leftJoin(reviewReason).on(reviewReason.review.id.eq(review.id))
-                .innerJoin(order).on(order.id.eq(review.order.id))
-                .innerJoin(orderGoods).on(orderGoods.order.id.eq(order.id))
-                .innerJoin(goods).on(goods.id.eq(orderGoods.goods.id))
-                .innerJoin(store).on(store.id.eq(goods.store.id))
-                .innerJoin(user).on(user.id.eq(store.user.id))
-                .where(conditions)
-                .orderBy(review.createdAt.desc())
-                .offset(pageable.getOffset())
-                .limit(pageable.getPageSize())
-                .transform(
-                        groupBy(review.id)
-                                .list(
-                                        Projections.constructor(
-                                                ReviewListDTO.class,
-                                                review.id,
-                                                review.rating,
-                                                list(reviewReason.satisfactionReason),
-                                                review.description,
-                                                review.createdAt,
-                                                list(reviewImage.name),
-                                                goods.id,
-                                                store.id
-                                        )
-                                )
-                );
+        return getReviewListDTOS(pageable, conditions);
     }
 
     @Override
@@ -81,6 +54,7 @@ public class ReviewRepositoryImpl implements ReviewRepositoryCustom {
         conditions.and(goods.id.eq(request.goodsId()));
         conditions.and(user.userStatus.eq(UserStatus.ACTIVE));
         conditions.and(order.orderStatus.eq(OrderStatus.COMPLETED));
+        conditions.and(review.reviewStatus.eq(ReviewStatus.ACTIVE));
         if (request.imageCheck()) {
             conditions.and(reviewImage.isNotNull());
         }
@@ -88,14 +62,14 @@ public class ReviewRepositoryImpl implements ReviewRepositoryCustom {
         NumberPath<Long> ratingCount = Expressions.numberPath(Long.class, "ratingCount");
 
         List<Tuple> results = queryFactory
-                .select(review.rating, review.rating.count().as(ratingCount))
+                .select(review.rating, review.id.countDistinct().as(ratingCount))
                 .from(review)
                 .leftJoin(reviewImage).on(reviewImage.review.id.eq(review.id))
-                .innerJoin(order).on(order.id.eq(review.order.id))
-                .innerJoin(orderGoods).on(orderGoods.order.id.eq(order.id))
+                .innerJoin(orderGoods).on(orderGoods.id.eq(review.orderGoods.id))
+                .innerJoin(order).on(order.id.eq(orderGoods.order.id))
                 .innerJoin(goods).on(goods.id.eq(orderGoods.goods.id))
                 .innerJoin(store).on(store.id.eq(goods.store.id))
-                .innerJoin(user).on(user.id.eq(store.user.id))
+                .innerJoin(user).on(user.id.eq(review.user.id))
                 .where(conditions)
                 .groupBy(review.rating)
                 .fetch();
@@ -120,7 +94,7 @@ public class ReviewRepositoryImpl implements ReviewRepositoryCustom {
                 }
             }
         }
-        
+
         double averageRating = totalCount > 0 ? Math.round(((double) ratingSum / totalCount) * 10.0) / 10.0 : 0.0;
 
         return new ReviewRatingSummaryDTO(
@@ -131,5 +105,62 @@ public class ReviewRepositoryImpl implements ReviewRepositoryCustom {
                 rating4,
                 rating5
         );
+    }
+
+    @Override
+    public List<ReviewListDTO> getReviewListByUser(final Long userId, final Pageable pageable) {
+        BooleanBuilder conditions = new BooleanBuilder();
+        conditions.and(review.user.id.eq(userId));
+        conditions.and(review.reviewStatus.eq(ReviewStatus.ACTIVE));
+        return getReviewListDTOS(pageable, conditions);
+    }
+
+    private List<ReviewListDTO> getReviewListDTOS(final Pageable pageable, final BooleanBuilder conditions) {
+        List<Long> reviewIds = queryFactory
+                .select(review.id)
+                .from(review)
+                .leftJoin(reviewImage).on(reviewImage.review.id.eq(review.id))
+                .leftJoin(reviewReason).on(reviewReason.review.id.eq(review.id))
+                .innerJoin(orderGoods).on(orderGoods.id.eq(review.orderGoods.id))
+                .innerJoin(order).on(order.id.eq(orderGoods.order.id))
+                .innerJoin(goods).on(goods.id.eq(orderGoods.goods.id))
+                .innerJoin(store).on(store.id.eq(goods.store.id))
+                .innerJoin(user).on(user.id.eq(review.user.id))
+                .where(conditions)
+                .orderBy(review.createdAt.desc())
+                .offset(pageable.getOffset())
+                .limit(pageable.getPageSize())
+                .fetch();
+
+        return queryFactory
+                .select(review, reviewImage, reviewReason, order, orderGoods, goods, store, user)
+                .from(review)
+                .leftJoin(reviewImage).on(reviewImage.review.id.eq(review.id))
+                .leftJoin(reviewReason).on(reviewReason.review.id.eq(review.id))
+                .innerJoin(orderGoods).on(orderGoods.id.eq(review.orderGoods.id))
+                .innerJoin(order).on(order.id.eq(orderGoods.order.id))
+                .innerJoin(goods).on(goods.id.eq(orderGoods.goods.id))
+                .innerJoin(store).on(store.id.eq(goods.store.id))
+                .innerJoin(user).on(user.id.eq(review.user.id))
+                .where(review.id.in(reviewIds))
+                .orderBy(review.createdAt.desc())
+                .transform(
+                        groupBy(review.id)
+                                .list(
+                                        Projections.constructor(
+                                                ReviewListDTO.class,
+                                                review.id,
+                                                review.rating,
+                                                set(reviewReason.satisfactionReason),
+                                                review.description,
+                                                review.createdAt,
+                                                set(reviewImage.name),
+                                                user.nickName,
+                                                goods.id,
+                                                store.id,
+                                                store.name
+                                        )
+                                )
+                );
     }
 }

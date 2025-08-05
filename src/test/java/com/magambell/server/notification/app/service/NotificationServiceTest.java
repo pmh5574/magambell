@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.magambell.server.auth.domain.ProviderType;
 import com.magambell.server.goods.domain.repository.GoodsRepository;
 import com.magambell.server.notification.app.port.in.request.SaveFcmTokenServiceRequest;
+import com.magambell.server.notification.app.port.in.request.SaveStoreOpenFcmTokenServiceRequest;
 import com.magambell.server.notification.domain.model.FcmToken;
 import com.magambell.server.notification.domain.repository.FcmTokenRepository;
 import com.magambell.server.stock.domain.repository.StockHistoryRepository;
@@ -76,7 +77,7 @@ class NotificationServiceTest {
                 "대표이름",
                 "01012345678",
                 "123491923",
-                Bank.IBK기업은행,
+                Bank.KB국민,
                 "102391485",
                 List.of(),
                 Approved.APPROVED,
@@ -98,11 +99,27 @@ class NotificationServiceTest {
         userRepository.deleteAllInBatch();
     }
 
+    @DisplayName("매장 오픈 FCM 토큰을 저장한다.")
+    @Test
+    void saveStoreOpenToken() {
+        // given
+        SaveStoreOpenFcmTokenServiceRequest request = new SaveStoreOpenFcmTokenServiceRequest(store.getId(),
+                "testToken", user.getId());
+
+        // when
+        notificationService.saveStoreOpenToken(request);
+
+        // then
+        List<FcmToken> fcmTokenList = fcmTokenRepository.findAll();
+        assertThat(fcmTokenList.size()).isEqualTo(1);
+        assertThat(fcmTokenList.get(0).getToken()).isEqualTo("testToken");
+    }
+
     @DisplayName("FCM용 토큰을 저장한다.")
     @Test
     void saveToken() {
         // given
-        SaveFcmTokenServiceRequest request = new SaveFcmTokenServiceRequest(store.getId(), "testToken", user.getId());
+        SaveFcmTokenServiceRequest request = new SaveFcmTokenServiceRequest("testToken", user.getId());
 
         // when
         notificationService.saveToken(request);

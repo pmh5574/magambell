@@ -6,6 +6,7 @@ import java.time.LocalDateTime;
 
 public record OrderDetailDTO(
         Long orderId,
+        Long orderGoodsId,
         OrderStatus orderStatus,
         String storeName,
         String storeAddress,
@@ -14,12 +15,15 @@ public record OrderDetailDTO(
         Integer totalPrice,
         LocalDateTime pickupTime,
         String memo,
+        LocalDateTime createdAt,
         Long storeId,
         Long reviewId
 ) {
     public OrderDetailResponse toResponse() {
+
         return new OrderDetailResponse(
                 String.valueOf(orderId),
+                String.valueOf(orderGoodsId),
                 orderStatus,
                 storeName,
                 storeAddress,
@@ -28,6 +32,7 @@ public record OrderDetailDTO(
                 totalPrice,
                 pickupTime,
                 memo,
+                createdAt,
                 String.valueOf(storeId),
                 String.valueOf(reviewId)
         );

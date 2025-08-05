@@ -40,6 +40,8 @@ public class QOrder extends EntityPathBase<Order> {
 
     public final com.magambell.server.payment.domain.model.QPayment payment;
 
+    public final EnumPath<com.magambell.server.order.domain.enums.PickupNotificationStatus> pickupNotificationStatus = createEnum("pickupNotificationStatus", com.magambell.server.order.domain.enums.PickupNotificationStatus.class);
+
     public final DateTimePath<java.time.LocalDateTime> pickupTime = createDateTime("pickupTime", java.time.LocalDateTime.class);
 
     public final NumberPath<Integer> totalPrice = createNumber("totalPrice", Integer.class);

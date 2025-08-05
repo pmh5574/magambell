@@ -3,12 +3,15 @@ package com.magambell.server.review.domain.model;
 import com.magambell.server.common.BaseTimeEntity;
 import com.magambell.server.common.enums.ErrorCode;
 import com.magambell.server.common.exception.InvalidRequestException;
-import com.magambell.server.order.domain.model.Order;
+import com.magambell.server.order.domain.model.OrderGoods;
 import com.magambell.server.review.app.port.in.dto.RegisterReviewDTO;
+import com.magambell.server.review.domain.enums.ReviewStatus;
 import com.magambell.server.user.domain.model.User;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -19,6 +22,7 @@ import jakarta.persistence.OneToMany;
 import jakarta.persistence.OneToOne;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -38,13 +42,16 @@ public class Review extends BaseTimeEntity {
 
     private String description;
 
+    @Enumerated(EnumType.STRING)
+    private ReviewStatus reviewStatus;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
     private User user;
 
     @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "order_id")
-    private Order order;
+    @JoinColumn(name = "order_goods_id")
+    private OrderGoods orderGoods;
 
     @OneToMany(mappedBy = "review", cascade = CascadeType.ALL)
     private List<ReviewImage> reviewImages = new ArrayList<>();
@@ -53,9 +60,10 @@ public class Review extends BaseTimeEntity {
     private List<ReviewReason> reviewReasons = new ArrayList<>();
 
     @Builder(access = AccessLevel.PRIVATE)
-    private Review(final Integer rating, final String description) {
+    private Review(final Integer rating, final String description, final ReviewStatus reviewStatus) {
         this.rating = rating;
         this.description = description;
+        this.reviewStatus = reviewStatus;
     }
 
     public static Review create(final RegisterReviewDTO dto) {
@@ -66,15 +74,20 @@ public class Review extends BaseTimeEntity {
         Review review = Review.builder()
                 .rating(dto.rating())
                 .description(dto.description())
+                .reviewStatus(ReviewStatus.ACTIVE)
                 .build();
 
-        List<ReviewReason> list = dto.satisfactionReasons().stream()
+        List<ReviewReason> list = Optional.ofNullable(dto.satisfactionReasons())
+                .orElse(List.of())
+                .stream()
                 .map(ReviewReason::new)
                 .toList();
 
         review.addUser(dto.user());
-        review.addOrder(dto.order());
-        review.addReviewReasons(list);
+        review.addOrderGoods(dto.orderGoods());
+        if (!list.isEmpty()) {
+            review.addReviewReasons(list);
+        }
 
         return review;
 
@@ -85,8 +98,8 @@ public class Review extends BaseTimeEntity {
         reviewReasons.forEach(reviewReason -> reviewReason.addReview(this));
     }
 
-    private void addOrder(final Order order) {
-        this.order = order;
+    private void addOrderGoods(final OrderGoods orderGoods) {
+        this.orderGoods = orderGoods;
     }
 
     private void addUser(final User user) {
@@ -97,5 +110,9 @@ public class Review extends BaseTimeEntity {
     public void addReviewImage(final ReviewImage reviewImage) {
         this.reviewImages.add(reviewImage);
         reviewImage.addReview(this);
+    }
+
+    public void delete() {
+        this.reviewStatus = ReviewStatus.DELETED;
     }
 }

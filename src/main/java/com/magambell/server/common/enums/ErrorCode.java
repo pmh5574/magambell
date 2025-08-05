@@ -28,6 +28,7 @@ public enum ErrorCode {
     STOCK_NOT_ENOUGH("재고가 부족합니다."),
     STOCK_INVALID_QUANTITY("수량은 0보다 커야 합니다."),
     INVALID_PICKUP_TIME("유효하지 않은 픽업 시간입니다."),
+    INVALID_NOW_TIME_PICKUP_TIME("픽업 시간이 지났습니다."),
     INVALID_TOTAL_PRICE("결제 금액이 올바르지 않습니다."),
     INVALID_CARD_NAME("카드를 선택해 주세요."),
     INVALID_EASY_PAY_PROVIDER("간편 결제 수단을 선택해 주세요."),
@@ -39,7 +40,9 @@ public enum ErrorCode {
     INVALID_PAYMENT_STATUS_PAID("결제가 완료되지 않았습니다."),
     INVALID_PAYMENT_STATUS_CANCEL("결제가 취소되지 않았습니다."),
     INVALID_PAYMENT_STATUS_FAILED("결제가 실패하지 않았습니다."),
-    INVALID_ORDER_STATUS("주문이 완료되지 않았습니다."),
+    INVALID_ORDER_STATUS_COMPLETED("주문이 완료되지 않았습니다."),
+    INVALID_ORDER_STATUS("요청할 수 없는 주문 상태입니다."),
+
     ORDER_ALREADY_ACCEPTED("주문이 이미 승인됐습니다."),
     ORDER_ALREADY_REJECTED("주문이 이미 거절됐습니다."),
     ORDER_NOT_APPROVED("주문이 승인되지 않았습니다."),
@@ -67,12 +70,15 @@ public enum ErrorCode {
     STOCK_NOT_FOUND("재고를 찾을 수 없습니다."),
     EMAIL_NOT_FOUND("이메일을 찾을 수 없습니다."),
     FAVORITE_NOT_FOUND("즐겨찾기한 매장을 찾을 수 없습니다."),
+    FCM_NOT_FOUND("알림 설정한 매장을 찾을 수 없습니다."),
+    REVIEW_NOT_FOUND("리뷰를 찾을 수 없습니다."),
 
     JWT_VERIFY_EXPIRED("인증정보가 만료 됐습니다."),
     JWT_VALIDATE_ERROR("유효한 인증정보가 아닙니다."),
+    JWT_TOKEN_EMPTY("토큰값이 존재하지 않습니다."),
 
     FIREBASE_INIT_FAILED("Firebase 초기화에 실패했습니다."),
-    FIREBASE_SEND_FAILED("Firebase 메세지 발송에 실패했습니다.."),
-    ;
+    FIREBASE_SEND_FAILED("Firebase 메세지 발송에 실패했습니다."),
+    OAUTH_APPLE_PARSE_FAILED("사용자 정보를 가져오는데 실패했습니다.");
     private final String message;
 }

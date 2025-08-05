@@ -12,15 +12,19 @@ import com.magambell.server.goods.domain.model.Goods;
 import com.magambell.server.goods.domain.repository.GoodsRepository;
 import com.magambell.server.order.app.port.in.dto.CreateOrderDTO;
 import com.magambell.server.order.domain.model.Order;
+import com.magambell.server.order.domain.model.OrderGoods;
 import com.magambell.server.order.domain.repository.OrderGoodsRepository;
 import com.magambell.server.order.domain.repository.OrderRepository;
 import com.magambell.server.payment.domain.repository.PaymentRepository;
 import com.magambell.server.review.app.port.in.dto.RegisterReviewDTO;
+import com.magambell.server.review.app.port.in.request.DeleteReviewServiceRequest;
 import com.magambell.server.review.app.port.in.request.RegisterReviewServiceRequest;
 import com.magambell.server.review.app.port.in.request.ReviewListServiceRequest;
+import com.magambell.server.review.app.port.in.request.ReviewMyServiceRequest;
 import com.magambell.server.review.app.port.in.request.ReviewRatingAllServiceRequest;
 import com.magambell.server.review.app.port.out.response.ReviewListDTO;
 import com.magambell.server.review.app.port.out.response.ReviewRatingSummaryDTO;
+import com.magambell.server.review.domain.enums.ReviewStatus;
 import com.magambell.server.review.domain.model.Review;
 import com.magambell.server.review.domain.repository.ReviewImageRepository;
 import com.magambell.server.review.domain.repository.ReviewReasonRepository;
@@ -84,7 +88,7 @@ class ReviewServiceTest {
     private User user;
     private Goods goods;
     private Order order;
-
+    private OrderGoods orderGoods;
 
     @BeforeEach
     void setUp() {
@@ -115,7 +119,7 @@ class ReviewServiceTest {
                 "대표",
                 "01099998888",
                 "123123",
-                Bank.IBK기업은행,
+                Bank.KB국민,
                 "9876543210",
                 List.of(),
                 Approved.APPROVED,
@@ -138,6 +142,7 @@ class ReviewServiceTest {
         Order createOrder = createOrderDTO.toOrder();
         createOrder.completed();
         order = orderRepository.save(createOrder);
+        orderGoods = order.getOrderGoodsList().get(0);
     }
 
     @AfterEach
@@ -161,7 +166,7 @@ class ReviewServiceTest {
     void registerReview() {
         // given
         RegisterReviewServiceRequest request = new RegisterReviewServiceRequest(
-                order.getId(),
+                orderGoods.getId(),
                 2,
                 List.of(FRIENDLY),
                 "test",
@@ -182,13 +187,13 @@ class ReviewServiceTest {
     void getReviewList() {
         // given
         RegisterReviewDTO dto = new RegisterReviewDTO(
-                order.getId(),
+                orderGoods.getId(),
                 2,
                 List.of(FRIENDLY, AFFORDABLE, ZERO),
                 "test",
                 List.of(),
                 user,
-                order
+                orderGoods
         );
         reviewRepository.save(Review.create(dto));
         ReviewListServiceRequest request = new ReviewListServiceRequest(goods.getId(), false, 1, 10);
@@ -198,12 +203,12 @@ class ReviewServiceTest {
 
         // then
         assertThat(reviewList).isNotNull();
-        assertThat(reviewList.get(0).satisfactionReasons().get(0)).isEqualTo(FRIENDLY);
+        assertThat(reviewList.get(0).satisfactionReasons()).contains(FRIENDLY);
         assertThat(reviewList.get(0).description()).isEqualTo("test");
         assertThat(reviewList.get(0).goodsId()).isEqualTo(goods.getId());
     }
 
-    @DisplayName("리뷰를 리스트를 출력한다.")
+    @DisplayName("리뷰를 리스트 평점별 조회")
     @Test
     void getReviewRatingAll() {
         // given
@@ -230,20 +235,71 @@ class ReviewServiceTest {
         assertThat(reviewRatingAll.rating2Count()).isEqualTo(2);
     }
 
+    @DisplayName("내가 작성한 리뷰 목록")
+    @Test
+    void getReviewListByUser() {
+        // given
+        RegisterReviewDTO dto = new RegisterReviewDTO(
+                order.getId(),
+                2,
+                List.of(FRIENDLY, AFFORDABLE, ZERO),
+                "test",
+                List.of(),
+                user,
+                orderGoods
+        );
+        reviewRepository.save(Review.create(dto));
+        ReviewMyServiceRequest request = new ReviewMyServiceRequest(1, 10, user.getId());
+
+        // when
+        List<ReviewListDTO> reviewList = reviewService.getReviewListByUser(request);
+
+        // then
+        assertThat(reviewList).isNotNull();
+        assertThat(reviewList.get(0).satisfactionReasons()).contains(FRIENDLY);
+        assertThat(reviewList.get(0).description()).isEqualTo("test");
+        assertThat(reviewList.get(0).nickName()).isEqualTo(user.getNickName());
+    }
+
+    @DisplayName("내가 작성한 리뷰 삭제")
+    @Test
+    void deleteReview() {
+        // given
+        RegisterReviewDTO dto = new RegisterReviewDTO(
+                order.getId(),
+                2,
+                List.of(FRIENDLY, AFFORDABLE, ZERO),
+                "test",
+                List.of(),
+                user,
+                orderGoods
+        );
+        Review review = reviewRepository.save(Review.create(dto));
+
+        // when
+        reviewService.deleteReview(new DeleteReviewServiceRequest(review.getId(), user.getId()));
+
+        // then
+        List<Review> reviewAll = reviewRepository.findAll();
+        assertThat(reviewAll).hasSize(1);
+        assertThat(reviewAll.get(0).getReviewStatus()).isEqualTo(ReviewStatus.DELETED);
+    }
+
     private Review createReview(int i) {
         CreateOrderDTO createOrderDTO = new CreateOrderDTO(user, goods, 1, 9000, LocalDateTime.now(), "test");
         Order createOrder = createOrderDTO.toOrder();
         createOrder.completed();
         order = orderRepository.save(createOrder);
+        orderGoods = order.getOrderGoodsList().get(0);
 
         RegisterReviewDTO dto = new RegisterReviewDTO(
-                order.getId(),
+                order.getOrderGoodsList().get(0).getId(),
                 i,
                 List.of(FRIENDLY, AFFORDABLE, ZERO),
                 "test",
                 List.of(),
                 user,
-                order
+                orderGoods
         );
 
         return Review.create(dto);

@@ -11,7 +11,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 public interface OrderUseCase {
-    CreateOrderResponseDTO createOrder(CreateOrderServiceRequest serviceRequest, Long userId);
+    CreateOrderResponseDTO createOrder(CreateOrderServiceRequest serviceRequest, Long userId, LocalDateTime now);
 
     List<OrderListDTO> getOrderList(CustomerOrderListServiceRequest request, Long userId);
 
@@ -26,4 +26,8 @@ public interface OrderUseCase {
     void cancelOrder(Long orderId, Long userId);
 
     void completedOrder(Long orderId, Long userId);
+
+    void batchRejectOrdersBeforePickup(LocalDateTime pickupTime, LocalDateTime createdAtCutOff);
+
+    void autoRejectOrdersAfter(LocalDateTime minusMinutes, LocalDateTime pickupTime);
 }

@@ -67,9 +67,22 @@ public class AuthService implements AuthUseCase {
         userCommandPort.deleteBySocial(request.providerType(), userId);
     }
 
+    @Transactional
     @Override
     public JwtToken reissueAccessToken(final String refreshToken) {
         return jwtService.reissueAccessToken(refreshToken);
+    }
+
+    @Override
+    public JwtToken userTest() {
+        User user = userQueryPort.findById(742149639478281692L);
+        return jwtService.createJwtToken(user.getId(), user.getUserRole());
+    }
+
+    @Override
+    public JwtToken ownerTest() {
+        User user = userQueryPort.findById(742149639478281693L);
+        return jwtService.createJwtToken(user.getId(), user.getUserRole());
     }
 
     private User oAuthSignUp(final OAuthUserInfo userInfo, final SocialLoginServiceRequest request) {
@@ -97,12 +110,12 @@ public class AuthService implements AuthUseCase {
         if (userRole == null) {
             throw new InvalidRequestException(ErrorCode.INVALID_USER_ROLE);
         }
-        if (phoneNumber == null) {
-            throw new InvalidRequestException(ErrorCode.INVALID_PHONE_NUMBER);
-        }
-        if (!phoneNumber.matches("^(?!.*-)[0-9]{10,11}$")) {
-            throw new InvalidRequestException(ErrorCode.USER_VALID_PHONE);
-        }
+//        if (phoneNumber == null) {
+//            throw new InvalidRequestException(ErrorCode.INVALID_PHONE_NUMBER);
+//        }
+//        if (!phoneNumber.matches("^(?!.*-)[0-9]{10,11}$")) {
+//            throw new InvalidRequestException(ErrorCode.USER_VALID_PHONE);
+//        }
     }
 
     private void validateUserRole(final UserRole userRole) {

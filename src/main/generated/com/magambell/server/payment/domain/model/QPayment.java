@@ -33,7 +33,7 @@ public class QPayment extends EntityPathBase<Payment> {
     //inherited
     public final DateTimePath<java.time.LocalDateTime> createdAt = _super.createdAt;
 
-    public final EnumPath<com.magambell.server.payment.domain.enums.EasyPayProvider> easyPayProvider = createEnum("easyPayProvider", com.magambell.server.payment.domain.enums.EasyPayProvider.class);
+    public final StringPath easyPayProvider = createString("easyPayProvider");
 
     public final StringPath failReason = createString("failReason");
 
@@ -50,7 +50,7 @@ public class QPayment extends EntityPathBase<Payment> {
 
     public final EnumPath<com.magambell.server.payment.domain.enums.PaymentStatus> paymentStatus = createEnum("paymentStatus", com.magambell.server.payment.domain.enums.PaymentStatus.class);
 
-    public final EnumPath<com.magambell.server.payment.domain.enums.PayType> payType = createEnum("payType", com.magambell.server.payment.domain.enums.PayType.class);
+    public final StringPath payType = createString("payType");
 
     public final StringPath transactionId = createString("transactionId");
 

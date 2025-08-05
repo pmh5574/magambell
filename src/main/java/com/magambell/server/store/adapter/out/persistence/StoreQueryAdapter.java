@@ -3,9 +3,9 @@ package com.magambell.server.store.adapter.out.persistence;
 import com.magambell.server.common.annotation.Adapter;
 import com.magambell.server.common.enums.ErrorCode;
 import com.magambell.server.common.exception.NotFoundException;
+import com.magambell.server.store.app.port.in.request.CloseStoreListServiceRequest;
 import com.magambell.server.store.app.port.in.request.SearchStoreListServiceRequest;
 import com.magambell.server.store.app.port.out.StoreQueryPort;
-import com.magambell.server.store.app.port.out.dto.StoreDetailDTO;
 import com.magambell.server.store.app.port.out.response.OwnerStoreDetailDTO;
 import com.magambell.server.store.app.port.out.response.StoreListDTOResponse;
 import com.magambell.server.store.domain.model.Store;
@@ -39,7 +39,7 @@ public class StoreQueryAdapter implements StoreQueryPort {
     }
 
     @Override
-    public StoreDetailDTO getStoreDetail(final Long storeId) {
+    public StoreDetailResponse getStoreDetail(final Long storeId) {
         return storeRepository.getStoreDetail(storeId)
                 .orElseThrow(() -> new NotFoundException(ErrorCode.STORE_NOT_FOUND));
     }
@@ -54,5 +54,15 @@ public class StoreQueryAdapter implements StoreQueryPort {
     public OwnerStoreDetailDTO getOwnerStoreInfo(final User user) {
         return storeRepository.getOwnerStoreInfo(user.getId())
                 .orElseThrow(() -> new NotFoundException(ErrorCode.STORE_NOT_FOUND));
+    }
+
+    @Override
+    public List<StoreListDTOResponse> getCloseStoreList(final CloseStoreListServiceRequest request) {
+        return storeRepository.getCloseStoreList(request);
+    }
+
+    @Override
+    public List<StoreListDTOResponse> getWaitingStoreList(final Pageable pageable) {
+        return storeRepository.getWaitingStoreList(pageable);
     }
 }
